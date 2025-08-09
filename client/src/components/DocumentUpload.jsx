@@ -308,6 +308,34 @@ function DocumentUpload({ caseId, documents = [], onDocumentUpload, onDocumentDe
                     )}
                   </div>
                   
+                  {/* Document Classification Display */}
+                  {doc.classification && (
+                    <div className="document-classification">
+                      <div className="classification-header">
+                        <span className="classification-icon">🤖</span>
+                        <span className="classification-title">AI Classification</span>
+                      </div>
+                      <div className="classification-content">
+                        <div className="classification-main">
+                          <span className="classification-type">{doc.classification.document_type}</span>
+                          <span className="classification-confidence">
+                            {(doc.classification.confidence * 100).toFixed(0)}% confidence
+                          </span>
+                        </div>
+                        {doc.classification.alternative_types && doc.classification.alternative_types.length > 0 && (
+                          <div className="classification-alternatives">
+                            <span className="alternatives-label">Alternative matches:</span>
+                            {doc.classification.alternative_types.map((alt, idx) => (
+                              <span key={idx} className="alternative-type">
+                                {alt.type} ({(alt.confidence * 100).toFixed(0)}%)
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
                   {/* OCR Metadata Display */}
                   {doc.ocr_metadata && (
                     <div className="ocr-metadata">
@@ -345,7 +373,7 @@ function DocumentUpload({ caseId, documents = [], onDocumentUpload, onDocumentDe
                         )}
                         {doc.ocr_metadata.confidence > 0 && (
                           <div className="metadata-item">
-                            <span className="metadata-label">Confidence:</span>
+                            <span className="metadata-label">OCR Confidence:</span>
                             <span className="metadata-value">
                               {(doc.ocr_metadata.confidence * 100).toFixed(0)}%
                             </span>

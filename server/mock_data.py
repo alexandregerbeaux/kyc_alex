@@ -293,8 +293,8 @@ CASES = [
     {
         "id": "C-1004",
         "customer": {
-            "name": "Emma Wilson",
-            "dob": "1995-05-18",
+            "name": "JaeHee Lim",
+            "dob": "1991-0-18",
             "address": "321 Elm St, Chicago, IL 60601",
             "tier": "Standard",
             "isWealthCustomer": False

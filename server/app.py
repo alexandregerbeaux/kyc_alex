@@ -34,6 +34,43 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
+def classify_document_type(file_path, file_type):
+    """
+    Classify document type using Mistral VLM
+    This is a placeholder for your Mistral VLM implementation
+    """
+    # TODO: Implement your Mistral VLM classification here
+    # This is dummy code as requested
+    
+    import random
+    
+    # Dummy classification logic - replace with your Mistral VLM implementation
+    document_types = [
+        "Employment Pass",
+        "Passport", 
+        "Bank Statement",
+        "Billing Form",
+        "Employment Letter"
+    ]
+    
+    # Simulate classification with confidence scores
+    classification_result = {
+        "document_type": random.choice(document_types),
+        "confidence": round(random.uniform(0.85, 0.99), 2),
+        "alternative_types": [
+            {
+                "type": random.choice([t for t in document_types if t != classification_result.get("document_type", "")]),
+                "confidence": round(random.uniform(0.10, 0.30), 2)
+            }
+        ],
+        "classification_status": "completed"
+    }
+    
+    print(f"Document classified as: {classification_result['document_type']} with confidence: {classification_result['confidence']}")
+    
+    return classification_result
+
+
 def process_document_with_ocr(file_path, file_type):
     """
     Process document with OCR using Mistral API
@@ -327,10 +364,13 @@ def upload_document(case_id):
     # Save the file
     file.save(file_path)
     
-    # Process with OCR (placeholder for Mistral API)
+    # Step 1: Classify document type using Mistral VLM
+    classification_result = classify_document_type(file_path, file_extension)
+    
+    # Step 2: Process with OCR (placeholder for Mistral API)
     ocr_result = process_document_with_ocr(file_path, file_extension)
     
-    # Create document entry
+    # Create document entry with classification
     new_doc = {
         "id": doc_id,
         "name": name,
@@ -340,7 +380,8 @@ def upload_document(case_id):
         "status": "Pending Review",
         "category": category,
         "file_path": file_path,
-        "ocr_result": ocr_result  # Store OCR results
+        "ocr_result": ocr_result,  # Store OCR results
+        "classification": classification_result  # Store classification results
     }
     
     # Initialize documents array if it doesn't exist
@@ -373,6 +414,11 @@ def upload_document(case_id):
                 "date_of_issue": ocr_result.get("date_of_issue", ""),
                 "date_of_expiry": ocr_result.get("date_of_expiry", ""),
                 "confidence": ocr_result.get("confidence", 0)
+            },
+            "classification": {
+                "document_type": classification_result.get("document_type", "Unknown"),
+                "confidence": classification_result.get("confidence", 0),
+                "alternative_types": classification_result.get("alternative_types", [])
             }
         },
         "caseStatus": case['status']
