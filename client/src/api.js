@@ -85,3 +85,78 @@ export async function postDecision(id, payload) {
     throw error;
   }
 }
+
+// Review bank statement
+export async function reviewBankStatement(caseId, statementId, payload) {
+  try {
+    const response = await fetch(`${API}/api/cases/${caseId}/bank-statements/${statementId}/review`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse(response);
+  } catch (error) {
+    console.error(`Failed to review bank statement ${statementId} for case ${caseId}:`, error);
+    throw error;
+  }
+}
+
+// Review occupation form
+export async function reviewOccupationForm(caseId, payload) {
+  try {
+    const response = await fetch(`${API}/api/cases/${caseId}/occupation-form/review`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse(response);
+  } catch (error) {
+    console.error(`Failed to review occupation form for case ${caseId}:`, error);
+    throw error;
+  }
+}
+
+// Get documents for a case
+export async function fetchDocuments(caseId) {
+  try {
+    const response = await fetch(`${API}/api/cases/${caseId}/documents`);
+    return handleResponse(response);
+  } catch (error) {
+    console.error(`Failed to fetch documents for case ${caseId}:`, error);
+    throw error;
+  }
+}
+
+// Upload document for a case
+export async function uploadDocument(caseId, documentData) {
+  try {
+    const response = await fetch(`${API}/api/cases/${caseId}/documents`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(documentData),
+    });
+    return handleResponse(response);
+  } catch (error) {
+    console.error(`Failed to upload document for case ${caseId}:`, error);
+    throw error;
+  }
+}
+
+// Delete document from a case
+export async function deleteDocument(caseId, documentId) {
+  try {
+    const response = await fetch(`${API}/api/cases/${caseId}/documents/${documentId}`, {
+      method: 'DELETE',
+    });
+    return handleResponse(response);
+  } catch (error) {
+    console.error(`Failed to delete document ${documentId} for case ${caseId}:`, error);
+    throw error;
+  }
+}
