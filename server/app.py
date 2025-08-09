@@ -364,7 +364,16 @@ def upload_document(case_id):
             "uploadedAt": new_doc["uploadedAt"],
             "status": new_doc["status"],
             "category": new_doc["category"],
-            "ocr_processed": ocr_result.get("processing_status") == "completed"
+            "ocr_processed": ocr_result.get("processing_status") == "completed",
+            "ocr_metadata": {
+                "Name": ocr_result.get("Name", ""),
+                "Occupation": ocr_result.get("Occupation", ""),
+                "FIN": ocr_result.get("FIN", ""),
+                "date_of_application": ocr_result.get("date_of_application", ""),
+                "date_of_issue": ocr_result.get("date_of_issue", ""),
+                "date_of_expiry": ocr_result.get("date_of_expiry", ""),
+                "confidence": ocr_result.get("confidence", 0)
+            }
         },
         "caseStatus": case['status']
     })

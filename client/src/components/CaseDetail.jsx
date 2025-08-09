@@ -60,10 +60,16 @@ function CaseDetail({ selectedCaseId, onCaseUpdate, onStatusChange }) {
       // Pass both metadata and file to the API
       const result = await uploadDocument(caseData.id, documentData, file);
       
-      // Update local state
+      // Update local state with OCR metadata
+      const newDocument = {
+        ...result.document,
+        ocr_processed: result.document.ocr_processed || false,
+        ocr_metadata: result.document.ocr_metadata || null
+      };
+      
       setCaseData(prev => ({
         ...prev,
-        documents: [...(prev.documents || []), result.document],
+        documents: [...(prev.documents || []), newDocument],
         status: result.caseStatus || prev.status
       }));
       

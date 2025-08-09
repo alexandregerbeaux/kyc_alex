@@ -3,6 +3,8 @@ import React, { useState, useRef } from 'react';
 function DocumentUpload({ caseId, documents = [], onDocumentUpload, onDocumentDelete }) {
   const [isDragging, setIsDragging] = useState(false);
   const [uploadError, setUploadError] = useState(null);
+  const [uploadingFiles, setUploadingFiles] = useState(new Set());
+  const [ocrProcessing, setOcrProcessing] = useState(new Set());
   const fileInputRef = useRef(null);
 
   const handleDragEnter = (e) => {
@@ -73,9 +75,31 @@ function DocumentUpload({ caseId, documents = [], onDocumentUpload, onDocumentDe
         category: category
       };
       
-      // Pass both metadata and actual file to parent
-      if (onDocumentUpload) {
-        await onDocumentUpload(documentData, file);
+      // Show uploading state
+      setUploadingFiles(prev => new Set(prev).add(file.name));
+      setOcrProcessing(prev => new Set(prev).add(file.name));
+      
+      try {
+        // Pass both metadata and actual file to parent
+        if (onDocumentUpload) {
+          await onDocumentUpload(documentData, file);
+        }
+      } finally {
+        // Remove from uploading state
+        setUploadingFiles(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(file.name);
+          return newSet;
+        });
+        
+        // Remove from OCR processing after a delay to show completion
+        setTimeout(() => {
+          setOcrProcessing(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(file.name);
+            return newSet;
+          });
+        }, 1000);
       }
     }
   };
@@ -206,6 +230,32 @@ function DocumentUpload({ caseId, documents = [], onDocumentUpload, onDocumentDe
         </div>
       )}
 
+      {/* OCR Processing Indicator */}
+      {(uploadingFiles.size > 0 || ocrProcessing.size > 0) && (
+        <div className="ocr-processing-container">
+          <div className="ocr-processing-header">
+            <span className="ocr-icon">🔍</span>
+            <span>Processing Documents with OCR...</span>
+          </div>
+          {Array.from(new Set([...uploadingFiles, ...ocrProcessing])).map(fileName => (
+            <div key={fileName} className="ocr-processing-item">
+              <span className="file-name">{fileName}</span>
+              <div className="progress-bar">
+                <div 
+                  className={`progress-fill ${!uploadingFiles.has(fileName) ? 'complete' : ''}`}
+                  style={{
+                    width: uploadingFiles.has(fileName) ? '60%' : '100%'
+                  }}
+                />
+              </div>
+              <span className="status-text">
+                {uploadingFiles.has(fileName) ? 'Uploading & Processing...' : 'OCR Complete ✓'}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Document Categories Guide */}
       <div className="document-categories">
         <h3>Required Documents by Category:</h3>
@@ -251,7 +301,59 @@ function DocumentUpload({ caseId, documents = [], onDocumentUpload, onDocumentDe
                     <span className={`badge ${getStatusBadgeClass(doc.status)}`}>
                       {doc.status}
                     </span>
+                    {doc.ocr_processed && (
+                      <span className="badge badge-info" title="OCR Processed">
+                        OCR ✓
+                      </span>
+                    )}
                   </div>
+                  
+                  {/* OCR Metadata Display */}
+                  {doc.ocr_metadata && (
+                    <div className="ocr-metadata">
+                      <div className="metadata-title">Extracted Information:</div>
+                      <div className="metadata-grid">
+                        {doc.ocr_metadata.Name && (
+                          <div className="metadata-item">
+                            <span className="metadata-label">Name:</span>
+                            <span className="metadata-value">{doc.ocr_metadata.Name}</span>
+                          </div>
+                        )}
+                        {doc.ocr_metadata.Occupation && (
+                          <div className="metadata-item">
+                            <span className="metadata-label">Occupation:</span>
+                            <span className="metadata-value">{doc.ocr_metadata.Occupation}</span>
+                          </div>
+                        )}
+                        {doc.ocr_metadata.FIN && (
+                          <div className="metadata-item">
+                            <span className="metadata-label">FIN:</span>
+                            <span className="metadata-value">{doc.ocr_metadata.FIN}</span>
+                          </div>
+                        )}
+                        {doc.ocr_metadata.date_of_issue && (
+                          <div className="metadata-item">
+                            <span className="metadata-label">Issue Date:</span>
+                            <span className="metadata-value">{doc.ocr_metadata.date_of_issue}</span>
+                          </div>
+                        )}
+                        {doc.ocr_metadata.date_of_expiry && (
+                          <div className="metadata-item">
+                            <span className="metadata-label">Expiry Date:</span>
+                            <span className="metadata-value">{doc.ocr_metadata.date_of_expiry}</span>
+                          </div>
+                        )}
+                        {doc.ocr_metadata.confidence > 0 && (
+                          <div className="metadata-item">
+                            <span className="metadata-label">Confidence:</span>
+                            <span className="metadata-value">
+                              {(doc.ocr_metadata.confidence * 100).toFixed(0)}%
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 {doc.status === 'Pending Review' && onDocumentDelete && (
                   <button
