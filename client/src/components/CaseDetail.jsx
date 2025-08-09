@@ -53,11 +53,12 @@ function CaseDetail({ selectedCaseId, onCaseUpdate, onStatusChange }) {
     }
   }
 
-  async function handleDocumentUpload(documentData) {
+  async function handleDocumentUpload(documentData, file) {
     if (!caseData) return;
 
     try {
-      const result = await uploadDocument(caseData.id, documentData);
+      // Pass both metadata and file to the API
+      const result = await uploadDocument(caseData.id, documentData, file);
       
       // Update local state
       setCaseData(prev => ({

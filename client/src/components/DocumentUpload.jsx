@@ -65,7 +65,7 @@ function DocumentUpload({ caseId, documents = [], onDocumentUpload, onDocumentDe
       const category = determineCategory(file.name);
       const docType = determineDocType(file.name);
       
-      // Simulate upload
+      // Prepare document metadata
       const documentData = {
         name: file.name,
         type: docType,
@@ -73,8 +73,9 @@ function DocumentUpload({ caseId, documents = [], onDocumentUpload, onDocumentDe
         category: category
       };
       
+      // Pass both metadata and actual file to parent
       if (onDocumentUpload) {
-        await onDocumentUpload(documentData);
+        await onDocumentUpload(documentData, file);
       }
     }
   };

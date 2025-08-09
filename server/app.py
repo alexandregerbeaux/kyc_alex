@@ -4,6 +4,11 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from mock_data import CASES, POLICIES, WORKFLOW
 import copy
+import os
+import base64
+import random
+import datetime
+from werkzeug.utils import secure_filename
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -11,8 +16,99 @@ app = Flask(__name__)
 # Enable CORS for the Vite dev server (allow both common ports)
 CORS(app, origins=["http://localhost:5173", "http://localhost:5174"])
 
+# Configure upload settings
+UPLOAD_FOLDER = 'uploads'
+ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg', 'doc', 'docx'}
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # 10MB max file size
+
+# Create upload folder if it doesn't exist
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+
 # In-memory storage (copy to avoid modifying original mock data)
 cases_store = copy.deepcopy(CASES)
+
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def process_document_with_ocr(file_path, file_type):
+    """
+    Process document with OCR using Mistral API
+    This is a placeholder for Mistral API integration
+    """
+    # TODO: Implement Mistral API call here
+    # For now, return mock OCR results
+
+    
+    # Here you would:
+    # 1. Read the file content
+    # 2. Convert to base64 if needed for API
+    # 3. Call Mistral API endpoint
+    # 4. Process and return results
+
+
+    import os
+    import json
+    from pydantic import BaseModel, Field
+    from mistralai import Mistral
+    from mistralai import Mistral, DocumentURLChunk, ImageURLChunk, ResponseFormat
+    from mistralai.extra import response_format_from_pydantic_model
+
+    api_key = 'ZjM0pTT7sc11IrX80ZSXrXrrwI97fSGG'
+
+    client = Mistral(api_key=api_key)
+
+    uploaded_pdf = client.files.upload(
+        file={
+            "file_name": file_path,
+            "content": open(file_path, "rb"),
+        },
+        purpose="ocr"
+    )  
+
+    signed_url = client.files.get_signed_url(file_id=uploaded_pdf.id)
+
+
+
+    # Document Annotation response format
+    class Document(BaseModel):
+        Name: str
+        Occupation: str
+        FIN: str
+        date_of_application: str
+        date_of_issue: str
+        date_of_expiry: str
+
+    class Image(BaseModel):
+        image_type: str = Field(..., description="The type of the image.")
+        smiling: str = Field(..., description="Whether the person on the image smiling or not")
+        fraud: str = Field(..., description="Whether the document looks like it has been forged.")
+
+
+    # Client call
+    response = client.ocr.process(
+        model="mistral-ocr-latest",
+        pages=list(range(8)),
+        document={
+            "type": "document_url",
+            "document_url": signed_url.url,
+        },
+        bbox_annotation_format=response_format_from_pydantic_model(Image),
+        document_annotation_format=response_format_from_pydantic_model(Document),
+        include_image_base64=True
+    )
+
+    ocr_result = json.loads(response.document_annotation)
+
+    ocr_result['extracted_text'] = "Mock OCR text extracted from document"
+    ocr_result['confidence'] = 0.95
+    ocr_result['processing_status'] = "completed"
+
+    print(ocr_result)
+    return ocr_result
 
 
 @app.route('/api/health', methods=['GET'])
@@ -195,31 +291,56 @@ def get_documents(case_id):
 
 @app.route('/api/cases/<case_id>/documents', methods=['POST'])
 def upload_document(case_id):
-    """Upload a document for a case (simulated)"""
+    """Upload a document for a case with actual file handling"""
     # Find the case
     case = next((c for c in cases_store if c['id'] == case_id), None)
     if not case:
         return jsonify({"error": "case_not_found"}), 404
     
-    # Get document data from request body
-    print(request)
-    data = request.get_json()
-    print(data)
-    if not data or 'name' not in data:
-        return jsonify({"error": "document name required"}), 400
+    # Check if file is in request
+    if 'file' not in request.files:
+        return jsonify({"error": "no file provided"}), 400
     
-    # Create new document entry
-    import random
-    import datetime
+    file = request.files['file']
     
+    # Check if file is selected
+    if file.filename == '':
+        return jsonify({"error": "no file selected"}), 400
+    
+    # Validate file type
+    if not allowed_file(file.filename):
+        return jsonify({"error": "file type not allowed"}), 400
+    
+    # Get form data
+    name = request.form.get('name', file.filename)
+    doc_type = request.form.get('type', 'Unknown')
+    category = request.form.get('category', 'Other')
+    size = request.form.get('size', '0')
+    
+    # Generate unique filename
+    doc_id = f"DOC-{random.randint(100, 999)}"
+    filename = secure_filename(file.filename)
+    file_extension = filename.rsplit('.', 1)[1].lower()
+    unique_filename = f"{case_id}_{doc_id}.{file_extension}"
+    file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+    
+    # Save the file
+    file.save(file_path)
+    
+    # Process with OCR (placeholder for Mistral API)
+    ocr_result = process_document_with_ocr(file_path, file_extension)
+    
+    # Create document entry
     new_doc = {
-        "id": f"DOC-{random.randint(100, 999)}",
-        "name": data.get('name'),
-        "type": data.get('type', 'Unknown'),
-        "size": data.get('size', 0),
+        "id": doc_id,
+        "name": name,
+        "type": doc_type,
+        "size": int(size),
         "uploadedAt": datetime.datetime.now().isoformat() + 'Z',
         "status": "Pending Review",
-        "category": data.get('category', 'Other')
+        "category": category,
+        "file_path": file_path,
+        "ocr_result": ocr_result  # Store OCR results
     }
     
     # Initialize documents array if it doesn't exist
@@ -235,7 +356,16 @@ def upload_document(case_id):
     
     return jsonify({
         "ok": True,
-        "document": new_doc,
+        "document": {
+            "id": new_doc["id"],
+            "name": new_doc["name"],
+            "type": new_doc["type"],
+            "size": new_doc["size"],
+            "uploadedAt": new_doc["uploadedAt"],
+            "status": new_doc["status"],
+            "category": new_doc["category"],
+            "ocr_processed": ocr_result.get("processing_status") == "completed"
+        },
         "caseStatus": case['status']
     })
 
@@ -248,18 +378,54 @@ def delete_document(case_id, doc_id):
     if not case:
         return jsonify({"error": "case_not_found"}), 404
     
-    # Find and remove the document
+    # Find the document to delete
     documents = case.get('documents', [])
-    original_count = len(documents)
-    case['documents'] = [doc for doc in documents if doc['id'] != doc_id]
+    doc_to_delete = next((doc for doc in documents if doc['id'] == doc_id), None)
     
-    if len(case['documents']) == original_count:
+    if not doc_to_delete:
         return jsonify({"error": "document_not_found"}), 404
+    
+    # Delete the actual file if it exists
+    if 'file_path' in doc_to_delete and os.path.exists(doc_to_delete['file_path']):
+        try:
+            os.remove(doc_to_delete['file_path'])
+        except Exception as e:
+            print(f"Error deleting file: {e}")
+    
+    # Remove from documents list
+    case['documents'] = [doc for doc in documents if doc['id'] != doc_id]
     
     return jsonify({
         "ok": True,
         "deleted": doc_id
     })
+
+
+@app.route('/api/cases/<case_id>/documents/<doc_id>/ocr', methods=['GET'])
+def get_document_ocr(case_id, doc_id):
+    """Get OCR results for a specific document"""
+    # Find the case
+    case = next((c for c in cases_store if c['id'] == case_id), None)
+    if not case:
+        return jsonify({"error": "case_not_found"}), 404
+    
+    # Find the document
+    documents = case.get('documents', [])
+    document = next((doc for doc in documents if doc['id'] == doc_id), None)
+    
+    print(documents)
+
+    if not document:
+        return jsonify({"error": "document_not_found"}), 404
+    
+    # Return OCR results if available
+    if 'ocr_result' in document:
+        return jsonify({
+            "ok": True,
+            "ocr_result": document['ocr_result']
+        })
+    else:
+        return jsonify({"error": "no_ocr_results"}), 404
 
 
 @app.errorhandler(404)

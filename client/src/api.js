@@ -132,14 +132,20 @@ export async function fetchDocuments(caseId) {
 }
 
 // Upload document for a case
-export async function uploadDocument(caseId, documentData) {
+export async function uploadDocument(caseId, documentData, file) {
   try {
+    // Use FormData to send the actual file
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('name', documentData.name);
+    formData.append('type', documentData.type);
+    formData.append('category', documentData.category);
+    formData.append('size', documentData.size.toString());
+    
     const response = await fetch(`${API}/api/cases/${caseId}/documents`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(documentData),
+      // Don't set Content-Type header - browser will set it with boundary for multipart/form-data
+      body: formData,
     });
     return handleResponse(response);
   } catch (error) {
