@@ -1,10 +1,13 @@
 import React, { useState, useRef } from 'react';
+import DocumentPreview from './DocumentPreview';
 
 function DocumentUpload({ caseId, documents = [], onDocumentUpload, onDocumentDelete }) {
   const [isDragging, setIsDragging] = useState(false);
   const [uploadError, setUploadError] = useState(null);
   const [uploadingFiles, setUploadingFiles] = useState(new Set());
   const [ocrProcessing, setOcrProcessing] = useState(new Set());
+  const [previewDocument, setPreviewDocument] = useState(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const fileInputRef = useRef(null);
 
   const handleDragEnter = (e) => {
@@ -383,15 +386,27 @@ function DocumentUpload({ caseId, documents = [], onDocumentUpload, onDocumentDe
                     </div>
                   )}
                 </div>
-                {doc.status === 'Pending Review' && onDocumentDelete && (
+                <div className="document-actions">
                   <button
-                    className="document-delete"
-                    onClick={() => onDocumentDelete(doc.id)}
-                    title="Delete document"
+                    className="document-preview-btn"
+                    onClick={() => {
+                      setPreviewDocument(doc);
+                      setIsPreviewOpen(true);
+                    }}
+                    title="Preview document"
                   >
-                    ❌
+                    👁️
                   </button>
-                )}
+                  {doc.status === 'Pending Review' && onDocumentDelete && (
+                    <button
+                      className="document-delete"
+                      onClick={() => onDocumentDelete(doc.id)}
+                      title="Delete document"
+                    >
+                      ❌
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -419,6 +434,17 @@ function DocumentUpload({ caseId, documents = [], onDocumentUpload, onDocumentDe
           </div>
         </div>
       )}
+      
+      {/* Document Preview Modal */}
+      <DocumentPreview
+        isOpen={isPreviewOpen}
+        onClose={() => {
+          setIsPreviewOpen(false);
+          setPreviewDocument(null);
+        }}
+        caseId={caseId}
+        document={previewDocument}
+      />
     </div>
   );
 }

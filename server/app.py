@@ -9,6 +9,12 @@ import base64
 import random
 import datetime
 from werkzeug.utils import secure_filename
+import os
+import json
+from pydantic import BaseModel, Field
+from mistralai import Mistral
+from mistralai import Mistral, DocumentURLChunk, ImageURLChunk, ResponseFormat
+from mistralai.extra import response_format_from_pydantic_model
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -52,14 +58,58 @@ def classify_document_type(file_path, file_type):
         "Billing Form",
         "Employment Letter"
     ]
-    
+    api_key = 'ZjM0pTT7sc11IrX80ZSXrXrrwI97fSGG'
+
+    client = Mistral(api_key=api_key)
+
+    uploaded_pdf = client.files.upload(
+        file={
+            "file_name": file_path,
+            "content": open(file_path, "rb"),
+        },
+        purpose="ocr"
+    )  
+
+    signed_url = client.files.get_signed_url(file_id=uploaded_pdf.id)
+
+    model = "mistral-small-latest"
+
+
+    # Define the messages for the chat
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": f"What is the type of this document? Response in a JSON format with key as document_type and a value between {document_types}"
+                },
+                {
+                    "type": "image_url",
+                    "image_url": signed_url.url
+                }
+            ]
+        }
+    ]
+
+    # Get the chat response
+    chat_response = client.chat.complete(
+        model=model,
+        messages=messages,
+        response_format=      {
+            "type": "json_object"
+        }
+    )
+
+    document_type = json.loads(chat_response.choices[0].message.content)['document_type']
+
     # Simulate classification with confidence scores
     classification_result = {
-        "document_type": random.choice(document_types),
+        "document_type": document_type,
         "confidence": round(random.uniform(0.85, 0.99), 2),
         "alternative_types": [
             {
-                "type": random.choice([t for t in document_types if t != classification_result.get("document_type", "")]),
+                "type": document_type,
                 "confidence": round(random.uniform(0.10, 0.30), 2)
             }
         ],
@@ -87,12 +137,7 @@ def process_document_with_ocr(file_path, file_type):
     # 4. Process and return results
 
 
-    import os
-    import json
-    from pydantic import BaseModel, Field
-    from mistralai import Mistral
-    from mistralai import Mistral, DocumentURLChunk, ImageURLChunk, ResponseFormat
-    from mistralai.extra import response_format_from_pydantic_model
+
 
     api_key = 'ZjM0pTT7sc11IrX80ZSXrXrrwI97fSGG'
 
@@ -481,6 +526,42 @@ def get_document_ocr(case_id, doc_id):
         })
     else:
         return jsonify({"error": "no_ocr_results"}), 404
+
+
+@app.route('/api/cases/<case_id>/documents/<doc_id>/preview', methods=['GET'])
+def get_document_preview(case_id, doc_id):
+    """Get document file for preview"""
+    from flask import send_file
+    import mimetypes
+    
+    # Find the case
+    case = next((c for c in cases_store if c['id'] == case_id), None)
+    if not case:
+        return jsonify({"error": "case_not_found"}), 404
+    
+    # Find the document
+    documents = case.get('documents', [])
+    document = next((doc for doc in documents if doc['id'] == doc_id), None)
+    
+    if not document:
+        return jsonify({"error": "document_not_found"}), 404
+    
+    # Check if file exists
+    if 'file_path' not in document or not os.path.exists(document['file_path']):
+        return jsonify({"error": "file_not_found"}), 404
+    
+    # Get file mime type
+    mime_type, _ = mimetypes.guess_type(document['file_path'])
+    if not mime_type:
+        mime_type = 'application/octet-stream'
+    
+    # Send file
+    return send_file(
+        document['file_path'],
+        mimetype=mime_type,
+        as_attachment=False,
+        download_name=document.get('name', 'document')
+    )
 
 
 @app.errorhandler(404)
